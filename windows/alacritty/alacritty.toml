@@ -1,0 +1,18 @@
+[terminal.shell]
+program = "wsl"
+args = ["-d", "Ubuntu", "--user", "<username>", "--cd", "~"]
+
+[general]
+import = [
+    "~/.config/alacritty/themes/themes/gruvbox_dark.toml"
+]
+
+
+[font]
+size = 16.0
+
+#ubuntu mononerd windows compatible: https://github.com/ryanoasis/nerd-fonts/releases/latest/download/UbuntuMono.zip
+normal      = { family = "UbuntuMono Nerd Font", style = "Regular" }
+bold        = { family = "UbuntuMono Nerd Font", style = "Bold" }
+italic      = { family = "UbuntuMono Nerd Font", style = "Italic" }
+bold_italic = { family = "UbuntuMono Nerd Font", style = "Bold Italic" }
