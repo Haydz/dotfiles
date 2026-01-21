@@ -1,0 +1,16 @@
+# Backup files
+*.backup.*
+*.old
+init.lua.back
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+
+# Test files
+lua/core/test
