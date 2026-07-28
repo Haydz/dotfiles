@@ -14,3 +14,11 @@ Thumbs.db
 
 # Test files
 lua/core/test
+
+# Config backups
+*.bak
+*.bak-*
+*.bak.*
+
+# Tool logs
+.nvimlog

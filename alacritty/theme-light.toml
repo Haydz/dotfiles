@@ -1,0 +1,56 @@
+# mode: light
+# GitHub Light High Contrast, tuned for readability.
+#
+# Background is knocked back from stock #ffffff to take the glare off while
+# staying close enough to a white browser that glancing between the two
+# costs almost no pupil adaptation (1.08:1 between them — 1.00:1 is exact).
+#
+# To go softer or brighter, walk this ladder. Text contrast stays far above
+# the 7:1 AAA bar the whole way, so pick purely on comfort. The "vs white"
+# column is what actually predicts whether you'll notice a step: anything
+# under ~10% is invisible without a side-by-side.
+#
+#   bg       vs white   text    vs browser
+#   #ffffff   - 0.0%   20.5:1     1.00:1   stock, glary
+#   #f4f6f9   - 8.0%   19.0:1     1.08:1   too subtle to perceive
+#   #e8ebf0   -17.1%   17.2:1     1.20:1
+#   #e0e4ec   -22.6%   16.1:1     1.27:1   <- current
+#   #d8dde6   -28.0%   15.1:1     1.36:1
+#   #d0d6e0   -33.1%   14.1:1     1.46:1
+#   #c8cfdb   -38.0%   13.1:1     1.57:1   starts reading as grey, not light
+#
+# Warm alternatives if cool grey feels clinical — same idea, cream tint:
+#   #faf8f4  -6%  /  #f5f2ec  -11%  /  #efeade  -18%  /  #e8e0cd  -25%
+#
+# Also changed from stock: normal/bright white #66707b -> #515a63.
+# That grey is what ls/prompts/comments use for secondary text; stock sat
+# at 5.0:1, below the 7:1 AAA bar. #515a63 is 7.0:1 in the same hue.
+# Stock version: themes/themes/github_light_high_contrast.toml
+
+[colors.primary]
+background = '#e0e4ec'
+foreground = '#010409'
+
+[colors.cursor]
+text = '#e0e4ec' # matches background so a block cursor inverts cleanly
+cursor = '#0e1116'
+
+[colors.normal]
+black = '#0e1116'
+red = '#a0111f'
+green = '#024c1a'
+yellow = '#3f2200'
+blue = '#0349b4'
+magenta = '#622cbc'
+cyan = '#1b7c83'
+white = '#515a63' # darkened from #66707b for AAA contrast
+
+[colors.bright]
+black = '#4b535d'
+red = '#86061d'
+green = '#055d20'
+yellow = '#4e2c00'
+blue = '#1168e3'
+magenta = '#622cbc'
+cyan = '#1b7c83'
+white = '#515a63' # darkened from #66707b for AAA contrast

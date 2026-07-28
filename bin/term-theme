@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# term-theme — flip Alacritty between light and dark.
+#
+#   term-theme          toggle
+#   term-theme light    match a white browser (zero pupil adaptation)
+#   term-theme dark     heads-down terminal work
+#   term-theme status   print current mode
+#
+# Also bound to Cmd+Shift+T in alacritty.toml.
+#
+# Works by rewriting the theme filename on the `import` line of
+# alacritty.toml, in place. Two deliberate choices there:
+#
+#   * It edits alacritty.toml rather than swapping a separate
+#     theme-active.toml. Alacritty builds its file-watch list at startup, so
+#     an import file created later is not watched until Alacritty restarts.
+#     alacritty.toml is always watched, so this works in running windows.
+#
+#   * It truncates and rewrites rather than mv-ing a temp file into place,
+#     so the inode is preserved and the watcher keeps tracking the file.
+set -euo pipefail
+
+CFG="${XDG_CONFIG_HOME:-$HOME/.config}/alacritty"
+MAIN="$CFG/alacritty.toml"
+
+# Read the mode off the import line only. The comments above it also name
+# both theme files, so grepping the whole file would read documentation
+# instead of configuration.
+current() {
+    local m
+    m=$(grep -vE '^[[:space:]]*#' "$MAIN" 2>/dev/null \
+        | grep -oE 'theme-(light|dark)\.toml' | head -1) || true
+    case "$m" in
+        theme-light.toml) echo light ;;
+        theme-dark.toml)  echo dark ;;
+        *)                echo unknown ;;
+    esac
+}
+
+case "${1:-toggle}" in
+    light|l)     mode=light ;;
+    dark|d)      mode=dark ;;
+    status|s)    current; exit 0 ;;
+    toggle|t|"") [[ "$(current)" == light ]] && mode=dark || mode=light ;;
+    -h|--help)   sed -n '2,8p' "$0" | cut -c3-; exit 0 ;;
+    *)           echo "term-theme: unknown option '$1'" >&2
+                 echo "usage: term-theme [light|dark|toggle|status]" >&2
+                 exit 2 ;;
+esac
+
+[[ -f "$MAIN" ]] || { echo "term-theme: missing $MAIN" >&2; exit 1; }
+[[ -f "$CFG/theme-$mode.toml" ]] || {
+    echo "term-theme: missing $CFG/theme-$mode.toml" >&2; exit 1; }
+
+tmp="$(mktemp "${TMPDIR:-/tmp}/term-theme.XXXXXX")"
+trap 'rm -f "$tmp"' EXIT
+# `/^[[:space:]]*#/!` skips comment lines — the docs above the import line
+# mention both theme files by name and must not be rewritten.
+sed -E "/^[[:space:]]*#/! s#theme-(light|dark)\.toml#theme-$mode.toml#" "$MAIN" >"$tmp"
+
+# This file is the entire terminal config — refuse to write anything that
+# came out empty or lost the import line.
+if [[ ! -s "$tmp" ]] || ! grep -q "theme-$mode\.toml" "$tmp"; then
+    echo "term-theme: refusing to write malformed config" >&2
+    exit 1
+fi
+
+cat "$tmp" >"$MAIN"   # truncate in place; keeps inode, keeps the watcher
+
+echo "alacritty → $mode"
+
+# Alacritty discards a bound command's stdout, so the line above goes
+# nowhere when fired from Cmd+Shift+T. Flash it in tmux instead, otherwise
+# a working toggle is indistinguishable from a broken one.
+# Absolute-path fallback: the keybinding spawns us with a minimal PATH that
+# may exclude the package-manager bin dir. Covers macOS (homebrew, arm64 and
+# x86_64) and Linux distro paths.
+tmux_bin="$(command -v tmux 2>/dev/null || true)"
+[[ -n "$tmux_bin" ]] || for p in /opt/homebrew/bin/tmux /usr/local/bin/tmux /usr/bin/tmux /bin/tmux; do
+    [[ -x "$p" ]] && { tmux_bin="$p"; break; }
+done
+
+if [[ -n "$tmux_bin" ]]; then
+    # Target each attached client explicitly: spawned from the keybinding we
+    # are outside tmux, so there is no "current client" to default to.
+    "$tmux_bin" list-clients -F '#{client_name}' 2>/dev/null | while read -r c; do
+        "$tmux_bin" display-message -c "$c" "alacritty → $mode" 2>/dev/null || true
+    done
+fi
