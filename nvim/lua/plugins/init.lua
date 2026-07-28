@@ -7,5 +7,7 @@ return {
   { import = "plugins.treesitter" },
   { import = "plugins.telescope" },
   { import = "plugins.obsidian" },
+  { import = "plugins.python" },
+  { import = "plugins.cmp" },
 }
 
