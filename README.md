@@ -76,9 +76,15 @@ term-contrast --quiet    # failures only; exits non-zero
 Changing the background means re-solving every colour against it — contrast
 is a property of a *pair*, so no hex value is portable between backgrounds.
 
-Note: after editing `theme-light.toml` or `theme-dark.toml` directly, toggle
-twice to apply. Alacritty builds its config file-watch list at startup, so
-imports are only live-reloaded once they existed when Alacritty launched.
+Editing `theme-light.toml` or `theme-dark.toml` directly applies straight
+away — they are imported, and Alacritty watches imported files as well as
+`alacritty.toml`. The startup caveat only affects a theme file that did
+*not* exist when Alacritty launched: it never enters the watch list, so it
+stays inert until a restart.
+
+What genuinely does not pick up a change is a **new window** (`Cmd+N`) —
+that shares the running process's in-memory config. Quit and relaunch when
+a font or colour change looks like it did nothing.
 
 ## Requirements
 
