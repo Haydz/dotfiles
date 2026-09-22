@@ -147,6 +147,35 @@ else
     missing_required=$((missing_required + 1))
 fi
 
+# bin/term-contrast needs `tomllib`, which is stdlib from python 3.11 only.
+# Optional, not required: nothing about the terminal or editor depends on it,
+# it is the theme-contrast audit that stops working.
+#
+# Test the capability rather than the version. Parsing `python3 --version`
+# breaks on distro suffixes ("3.11.2+", "3.9.6 (default, ...)"), and a
+# python3.11 binary can be installed while `python3` still resolves to
+# something older — which is exactly the case that would slip through.
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "  · python3 — bin/term-contrast audits the theme contrast floors"
+    hint "brew install python" "your package manager: python3 (3.11+)"
+    missing_optional=$((missing_optional + 1))
+elif python3 -c 'import tomllib' >/dev/null 2>&1; then
+    echo "  ✓ python3 $(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])') (term-contrast)"
+else
+    pyver=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || echo "?")
+    echo "  · python3 is $pyver — term-contrast needs 3.11+ for tomllib"
+    # A newer interpreter is often already installed under a versioned name
+    # even when `python3` is not it; point at it rather than a fresh install.
+    for p in python3.14 python3.13 python3.12 python3.11; do
+        if command -v "$p" >/dev/null 2>&1; then
+            echo "      $p is on PATH — run: $p bin/term-contrast"
+            break
+        fi
+    done
+    hint "brew install python" "your package manager: python3.11 or newer"
+    missing_optional=$((missing_optional + 1))
+fi
+
 echo
 echo "Neovim plugin dependencies (optional — nvim starts without these,"
 echo "the matching feature is just dead):"

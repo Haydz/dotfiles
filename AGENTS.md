@@ -52,9 +52,18 @@ Current contents:
 | `term-theme` | bash | flips Alacritty light/dark |
 | `term-contrast` | python **3.11+** (needs `tomllib`) | audits theme contrast |
 
-`term-contrast` exits with a clear message on older Python rather than
-traceback, and `install.sh --check` does *not* test for 3.11 — if these
-dotfiles land somewhere with an older interpreter, that check is the gap.
+`term-contrast` exits with a clear message on older Python rather than a
+traceback, and `install.sh --check` covers it as an *optional* dep — the
+terminal and editor do not depend on it, only the contrast audit does.
+
+That check tests the capability (`python3 -c 'import tomllib'`), not a
+version string, for two reasons worth preserving: `python3 --version`
+output carries distro suffixes that break parsing (`3.11.2+`,
+`3.9.6 (default, ...)`), and a `python3.12` binary is often installed while
+`python3` still resolves to something older — the exact case a version
+check is supposed to catch. When `python3` is too old it also looks for a
+newer versioned binary already on `PATH` and names it, since that is
+usually cheaper than installing anything.
 
 `alacritty/themes/` is a vendored copy of the alacritty-theme collection,
 tracked as plain files (not a submodule). `theme-light.toml` and
