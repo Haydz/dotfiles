@@ -1,8 +1,21 @@
 -- ~/.config/nvim/lua/plugins/obsidian.lua
+
+-- The vault is personal data, not something this repo can install. On a
+-- machine where it has not been synced yet, obsidian.nvim's setup() raises
+-- "At least one workspace is required!" — and because this plugin loads on
+-- VeryLazy, that error box appears on *every* startup, on a machine whose
+-- owner may not even use Obsidian. Gate the whole plugin on the directory
+-- existing so a fresh checkout is quiet; it activates once the vault is there.
+local VAULT = vim.fn.expand("~/secondbrain")
+
 return {
   "obsidian-nvim/obsidian.nvim",
 
   version = "*",
+
+  cond = function()
+    return vim.fn.isdirectory(VAULT) == 1
+  end,
 
   -- Make commands like :Obsidian new work from anywhere (even in [No Name])
   cmd = { "Obsidian" },
@@ -18,7 +31,7 @@ return {
 
   opts = {
     workspaces = {
-      { name = "secondbrain", path = "~/secondbrain" },
+      { name = "secondbrain", path = VAULT },
     },
 
 
