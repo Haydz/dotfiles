@@ -1,75 +1,129 @@
 # mode: dark
-# Catppuccin Mocha, tuned for readability.
-# Changed from stock: primary/dim/bright foreground #CDD6F4 -> #e6ebfa.
-# Stock is 19% less luminous than it looks like it should be and reads
-# as "faded". #e6ebfa keeps Mocha's blue-white hue at 13.8:1 contrast.
-# Do not edit directly if you want stock Mocha back:
-#   themes/themes/catppuccin_mocha.toml
+# Built for legibility, not inherited from an upstream theme.
+#
+# Replaced Catppuccin Mocha, which had two defects no amount of tuning fixed,
+# because they are properties of the palette rather than of the settings:
+#
+#   1. ANSI black sat at 1.80:1 against the background (bright black 2.46:1).
+#      That is the slot ls, git, delta, bat, fzf and most prompts use for
+#      comments and secondary text, so all of it was effectively invisible.
+#   2. normal and bright were byte-identical for all six hues (dE 0.0), so
+#      no program could render emphasis. Mocha's pastels sit near the top of
+#      the lightness range: there is no headroom to brighten them, and
+#      darkening normal would push it under the contrast floor.
+#
+# Every colour here is generated, not picked by eye: hues are evenly spaced
+# in OKLCh, and lightness is solved so each one lands on a measured contrast
+# target against the background, with chroma held constant across hues so the
+# set reads as one palette. Regenerate rather than nudging a single value.
+#
+#   slot                     target      measured
+#   primary.foreground                    13.58:1
+#   normal  (6 hues)          8.0:1     7.99-8.06:1
+#   bright  (6 hues)         11.5:1    11.42-11.57:1
+#   dim     (6 hues)          6.0:1     5.94-6.01:1   above AA 4.5:1
+#   normal.white                         11.04:1
+#   bright.white                         13.97:1
+#   normal.black              4.0:1       4.00:1      see note below
+#   bright.black              6.5:1       6.52:1      the comment slot
+#
+# Deliberate deviation from "everything at AAA 7:1": ANSI black (colour 0)
+# is held at 4.0:1 and bright black (colour 8) at 6.5:1. Pushing the dim
+# slots to 7:1 makes comments exactly as loud as code, which defeats their
+# purpose — dim text that cannot be de-emphasised is its own legibility
+# problem. 4.0:1 also keeps colour 0 dark enough to survive the TUIs that
+# use it as a *background* rather than a foreground. Everything that is
+# actually body text clears 7:1 with room to spare.
+#
+# Hue separation, CIEDE2000, tightest pair: dE 23 (yellow/green). Under ~10
+# is where two colours start getting confused; Mocha's tightest was dE 13.
+#
+# Background ladder — text contrast stays far above AAA the whole way, so
+# pick on comfort alone. Halation (light text bleeding on very dark grounds)
+# is the thing that gets worse as you go up, not contrast.
+#
+#   bg        text      note
+#   #0d0d12  14.63:1    near-black, strongest halation
+#   #111116  14.21:1
+#   #16161e  13.58:1    <- current
+#   #1b1b24  12.90:1
+#   #20202a  12.18:1
+#   #252531  11.42:1    starts reading as grey
+#
+# If you change the background, every colour above needs re-solving against
+# it — the contrast targets are what make this readable, and they are all
+# relative to this one value. The generator lives in the git history for the
+# commit that introduced this file.
 
 [colors.primary]
-background = '#1E1E2E' # base
-foreground = '#e6ebfa' # brightened text
-dim_foreground = '#e6ebfa'
-bright_foreground = '#e6ebfa'
+background = '#16161e'
+foreground = '#dbe0e9'
+dim_foreground = '#aeb2bc'
+bright_foreground = '#dee3ed'
 
 [colors.cursor]
-text = '#1E1E2E'
-cursor = '#F5E0DC' # rosewater
+text = '#16161e'
+cursor = '#dee3ed'
 
 [colors.vi_mode_cursor]
-text = '#1E1E2E'
-cursor = '#B4BEFE' # lavender
+text = '#16161e'
+cursor = '#b5cfff'
 
 [colors.search.matches]
-foreground = '#1E1E2E'
-background = '#A6ADC8' # subtext0
+foreground = '#16161e'
+background = '#c6cbd4'
 
 [colors.search.focused_match]
-foreground = '#1E1E2E'
-background = '#A6E3A1' # green
+foreground = '#16161e'
+background = '#a8dca2'
 
 [colors.footer_bar]
-foreground = '#1E1E2E'
-background = '#A6ADC8'
+foreground = '#16161e'
+background = '#c6cbd4'
 
 [colors.hints.start]
-foreground = '#1E1E2E'
-background = '#F9E2AF' # yellow
+foreground = '#16161e'
+background = '#dfcf86'
 
 [colors.hints.end]
-foreground = '#1E1E2E'
-background = '#A6ADC8'
+foreground = '#16161e'
+background = '#c6cbd4'
 
 [colors.selection]
-text = '#1E1E2E'
-background = '#F5E0DC' # rosewater
+text = '#16161e'
+background = '#c6cbd4'
 
+# 8.0:1 each. Body text — the weights you read for minutes at a time.
 [colors.normal]
-black = '#45475A' # surface1
-red = '#F38BA8'
-green = '#A6E3A1'
-yellow = '#F9E2AF'
-blue = '#89B4FA'
-magenta = '#F5C2E7'
-cyan = '#94E2D5'
-white = '#BAC2DE' # subtext1
+black = '#73777f'   # 4.00:1  dim slot, see header
+red = '#fc8e83'
+green = '#74be6d'
+yellow = '#c3ad37'
+blue = '#81adff'
+magenta = '#e292db'
+cyan = '#00c1c2'
+white = '#c6cbd4'   # 11.04:1
 
+# 11.5:1 each — a visible step up from normal (dE 9.4-12.3), so emphasis
+# actually reads as emphasis. This is the half Catppuccin could not provide.
 [colors.bright]
-black = '#585B70' # surface2
-red = '#F38BA8'
-green = '#A6E3A1'
-yellow = '#F9E2AF'
-blue = '#89B4FA'
-magenta = '#F5C2E7'
-cyan = '#94E2D5'
-white = '#A6ADC8' # subtext0
+black = '#979ca4'   # 6.52:1  comments, git hunk headers, ls metadata
+red = '#ffc0b7'
+green = '#a8dca2'
+yellow = '#dfcf86'
+blue = '#b5cfff'
+magenta = '#f7bdf1'
+cyan = '#79dfdf'
+white = '#dee3ed'   # 13.97:1
 
+# 6.0:1 each — genuinely de-emphasised but still above the AA 4.5:1 floor.
+# Mocha mirrored `normal` here, which made `dim` a no-op.
 [colors.dim]
-black = '#45475A'
-red = '#F38BA8'
-green = '#A6E3A1'
-yellow = '#F9E2AF'
-blue = '#89B4FA'
-magenta = '#F5C2E7'
-cyan = '#94E2D5'
-white = '#BAC2DE'
+black = '#5f636c'   # 2.99:1  the dimmest slot in the theme
+red = '#e1766b'
+green = '#5da556'
+yellow = '#ab940f'
+blue = '#6794e9'
+magenta = '#c87ac2'
+cyan = '#00a5a7'
+white = '#aeb2bc'   # 8.47:1

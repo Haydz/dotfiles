@@ -47,8 +47,12 @@ ln -s ~/dotfiles/bin/term-theme ~/.local/bin/term-theme
 
 ## Terminal theme
 
-Alacritty is tuned for readability: JetBrains Mono Medium, and light/dark
-themes whose colours all clear the WCAG AAA 7:1 contrast bar.
+Alacritty is tuned for readability: Atkinson Hyperlegible Mono Medium — the
+Braille Institute's low-vision typeface — and light/dark themes whose colours
+are generated against measured contrast rather than borrowed from a theme
+gallery. All body text clears the WCAG AAA 7:1 bar; the dim tier has its own
+lower floors on purpose, since a comment colour you can't de-emphasise is
+its own readability problem.
 
 Switch between them with `term-theme`, or with a keybinding:
 
@@ -56,12 +60,21 @@ Switch between them with `term-theme`, or with a keybinding:
 |---|---|
 | `term-theme` | toggle |
 | `term-theme light` | white-ish bg, matches a bright browser beside the terminal |
-| `term-theme dark` | Catppuccin Mocha |
+| `term-theme dark` | dark neutral, generated palette |
 | `term-theme status` | print current mode |
 | `Cmd+Shift+T` / `Ctrl+Shift+T` | toggle (macOS / Linux) |
 
 Both themes carry a documented ladder of background shades in their header
 comments, with measured contrast values, if you want to tune brightness.
+If you change a colour, re-run the audit rather than trusting the comment:
+
+```bash
+term-contrast            # full table for both themes
+term-contrast --quiet    # failures only; exits non-zero
+```
+
+Changing the background means re-solving every colour against it — contrast
+is a property of a *pair*, so no hex value is portable between backgrounds.
 
 Note: after editing `theme-light.toml` or `theme-dark.toml` directly, toggle
 twice to apply. Alacritty builds its config file-watch list at startup, so

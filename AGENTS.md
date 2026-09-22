@@ -66,10 +66,47 @@ line in place. Three non-obvious reasons it works the way it does:
 Corollary for anyone editing `theme-*.toml` directly: the change will not
 appear until you toggle twice, or restart Alacritty.
 
-Colours are chosen against measured WCAG contrast, and both themes keep every
-ANSI colour at or above the 7:1 AAA bar. Each theme file carries a ladder of
-alternative background shades with measured values in its header comment.
-If you change a colour, recompute — don't eyeball it.
+## Alacritty colours: run the audit, don't trust the comment
+
+Both themes are generated against measured contrast rather than inherited
+from an upstream theme. **`bin/term-contrast` is the source of truth** —
+run it after touching any colour:
+
+```bash
+./bin/term-contrast          # full table, both themes
+./bin/term-contrast --quiet  # failures only, exits non-zero
+```
+
+This tool exists because the previous claim here — "both themes keep every
+ANSI colour at or above the 7:1 AAA bar" — was false in both themes:
+
+- the light theme's grey carried a comment asserting 7.0:1. That was
+  measured against `#ffffff`; against the `#e0e4ec` actually in use it was
+  **5.51:1**, and ANSI cyan sat at **3.87:1**, below even AA.
+- the dark theme (Catppuccin Mocha) had ANSI black at **1.80:1** —
+  invisible — which is the slot ls, git, delta, bat and most prompts use
+  for comments. Its `normal` and `bright` were also byte-identical for all
+  six hues, so no program could render emphasis.
+
+Two rules follow, and they are why copying values from a theme gallery
+does not work here:
+
+1. **Contrast is a property of a pair.** A hex value is not "AAA"; it is
+   AAA *against one background*. Change the background and every colour
+   needs re-solving. Nothing transfers.
+2. **The policy is not "everything at AAA".** A terminal needs a readable
+   dim tier — comments that cannot be de-emphasised are their own
+   legibility problem — so the dim slots have deliberately lower floors.
+   `term-contrast` encodes the per-slot floors; edit them there, in one
+   place, rather than arguing with the numbers in a file comment.
+
+Note the two themes move in opposite directions: on the dark theme
+`bright` is *lighter* than `normal`, on the light theme it is *darker*,
+because on a light ground lighter means less contrast.
+
+Each theme file also carries a ladder of alternative background shades with
+measured values in its header comment. If you change a colour, recompute —
+don't eyeball it.
 
 ## Neovim: two lazy.nvim traps that fail silently
 
@@ -106,6 +143,7 @@ on every startup.
 ```bash
 bash -n install.sh bin/term-theme                  # shell syntax
 python3 -c "import tomllib,sys; [tomllib.load(open(f,'rb')) for f in sys.argv[1:]]" alacritty/*.toml
+./bin/term-contrast --quiet                        # theme contrast floors
 tmux -L test new-session -d 'read x'; tmux -L test show -g mouse; tmux -L test kill-server
 ./install.sh --check                               # every binary the config needs
 nvim --headless +qa                                # startup errors (silence = clean)
