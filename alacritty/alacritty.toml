@@ -28,8 +28,8 @@ padding = { x = 7, y = 4 }
 # Switch theme with `term-theme light|dark|toggle`, or Cmd+Shift+T.
 # That rewrites the filename on the import line just below, in place.
 #
-#   theme-light.toml  #ffffff bg — matches a white browser, no pupil adaptation
-#   theme-dark.toml   #1E1E2E bg — Catppuccin Mocha, brightened foreground
+#   theme-light.toml  #e0e4ec bg — near-white, low pupil adaptation vs a browser
+#   theme-dark.toml   #16161e bg — generated palette, all body text above 7:1
 #
 # It edits THIS file rather than swapping a separate active-theme file on
 # purpose. Alacritty builds its file-watch list at startup, so a newly
@@ -68,17 +68,19 @@ multiplier = 3
 #   Atkynson      496         668      632         1197
 #   JetBrains     550         730      600         1320
 #
-# Consequence: 20.0 here is NOT a size increase over the old JetBrains 18.0
-# — it is the number that reproduces it (18 * 550/496 = 19.96). Atkynson at
-# 18.0 would render ~10% smaller than the old font did, despite the
-# "hyperlegible" billing. The legibility win is the glyph shapes, not scale.
-# Don't tune this by eye against the point number; use the x-height column.
+# Consequence: these numbers do not transfer from the old JetBrains 18.0.
+# 20.0 is the size that *reproduces* it (18 * 550/496 = 19.96), not an
+# increase; Atkynson at 18.0 would render ~10% smaller than the old font
+# did, despite the "hyperlegible" billing. The legibility win is the glyph
+# shapes, not scale. Don't tune by eye against the point number — use the
+# x-height column, which is what perceived size actually tracks.
 #
 # Measured ladder (Retina logical px, `offset.y = 2` included in the height;
 # column/row counts are for a ~1800x1000px window):
 #
 #   size  x-height  vs JetBrains@18  cell w x h    cols  rows
-#   20.0    9.92px            +0%    12.6 x 25.9    141    38   <- current
+#   19.0    9.42px            -5%    12.0 x 24.7    148    40   <- current
+#   20.0    9.92px            +0%    12.6 x 25.9    141    38
 #   22.0   10.91px           +10%    13.9 x 28.3    128    35
 #   23.0   11.41px           +15%    14.5 x 29.5    122    33
 #   24.0   11.90px           +20%    15.2 x 30.7    117    32
@@ -88,7 +90,7 @@ multiplier = 3
 # so going up costs columns faster here than it used to. If a side-by-side
 # tmux split stops fitting, step DOWN this ladder rather than cutting
 # `offset.x` — horizontal crowding is the thing that actually hurts to read.
-size = 20.0
+size = 19.0
 
 # style = "Medium" not "Regular": macOS stopped doing subpixel antialiasing in
 # Mojave, so Regular-weight text renders thin and washed out. Medium compensates.
