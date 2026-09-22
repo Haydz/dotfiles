@@ -21,6 +21,18 @@ cd ~/dotfiles
 ./install.sh
 ```
 
+`install.sh` symlinks the config, then checks for every binary the config
+needs and prints the install command for anything missing. Linking is
+idempotent — re-running leaves existing correct links alone rather than
+piling up backups. Anything else in the way is moved to
+`<path>.backup.<timestamp>` first.
+
+To check dependencies without changing anything:
+
+```bash
+./install.sh --check
+```
+
 ### Manual Installation
 
 If you prefer to do it manually:
@@ -57,11 +69,30 @@ imports are only live-reloaded once they existed when Alacritty launched.
 
 ## Requirements
 
-- Neovim 0.9+
+`./install.sh --check` reports all of this for the machine you're on, with
+the install command for anything missing.
+
+Required:
+
+- Neovim 0.10+ — the config uses `vim.fs.root`, `vim.snippet` and `vim.uv`
 - Alacritty 0.13+ (TOML config)
 - tmux 3.1+ (for the `~/.config/tmux/` path)
-- Lazy.nvim (auto-installed by Neovim config)
+- A C compiler — nvim-treesitter compiles parsers on install
 - JetBrains Mono Nerd Font
+- Lazy.nvim (auto-installed by the Neovim config)
+
+Optional — Neovim starts fine without these, the matching feature is just
+inert:
+
+| Tool | Enables |
+|---|---|
+| `ripgrep` | telescope `live_grep` (`<leader>fg`) |
+| `gopls` | Go LSP: `gd`, `K`, rename, code actions |
+| `goimports` | Go format-on-save |
+| `golangci-lint` | Go diagnostics |
+| `pyright` | Python types, hover, completion |
+| `ruff` | Python lint + format-on-save |
+| `~/secondbrain` | obsidian.nvim; the plugin stays off until it exists |
 
 ### Fonts
 

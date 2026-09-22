@@ -71,13 +71,62 @@ ANSI colour at or above the 7:1 AAA bar. Each theme file carries a ladder of
 alternative background shades with measured values in its header comment.
 If you change a colour, recompute — don't eyeball it.
 
+## Neovim: two lazy.nvim traps that fail silently
+
+Both of these have already bitten this repo. Neither produces an error.
+
+1. **One plugin, one spec.** lazy merges every spec naming the same plugin
+   into a single plugin, and `config` / `opts`-as-a-function are single
+   values, not lists — so two files both declaring
+   `{ "neovim/nvim-lspconfig", config = ... }` resolve to whichever lazy
+   merges last, and the other is discarded. `go.lua` and `python.lua` each
+   did this; python won, and **gopls never started** — the Go keymaps just
+   did nothing. All language servers now live in one spec in `lsp.lua`, and
+   all treesitter parsers in one `ensure_installed` list in
+   `treesitter.lua`. Add to those lists; do not add a second spec.
+
+2. **`lua/plugins/init.lua` is the whole import list.** `core/lazy.lua` does
+   `import = "plugins"`, and because `lua/plugins/init.lua` exists, *that
+   file* is what gets imported — a new `lua/plugins/foo.lua` is **not**
+   picked up until it is listed there. `go.lua` and `autopairs.lua` were
+   missing from the list.
+
+Also: `nvim-treesitter` is pinned to `branch = "master"` on purpose. Upstream
+moved its default branch to `main`, a rewrite with no
+`require("nvim-treesitter.configs")` — the API `treesitter.lua` calls. Drop
+the pin only together with rewriting that file.
+
+`obsidian.nvim` is gated behind `cond` on `~/secondbrain` existing. Its
+`setup()` raises when the vault is absent, and it loads on `VeryLazy`, so
+without the gate a machine that has not synced the vault gets an error box
+on every startup.
+
 ## Verifying changes
 
 ```bash
 bash -n install.sh bin/term-theme                  # shell syntax
 python3 -c "import tomllib,sys; [tomllib.load(open(f,'rb')) for f in sys.argv[1:]]" alacritty/*.toml
 tmux -L test new-session -d 'read x'; tmux -L test show -g mouse; tmux -L test kill-server
+./install.sh --check                               # every binary the config needs
+nvim --headless +qa                                # startup errors (silence = clean)
 ```
+
+Assert on behaviour, not on the plugin being in the spec — the traps above
+all leave the spec looking correct. To check a language server really
+attaches:
+
+```bash
+nvim --headless /path/to/file.go -c 'lua
+  vim.wait(8000, function() return #vim.lsp.get_clients({bufnr=0,name="gopls"})>0 end)
+  print(vim.inspect(vim.tbl_map(function(c) return c.name end,
+    vim.lsp.get_clients({bufnr=0}))))' -c qa
+```
+
+Note that `ruff` registers formatting *dynamically*: its
+`server_capabilities.documentFormattingProvider` is nil, and only
+`client:supports_method("textDocument/formatting")` reports it, once the
+registration lands. Waiting merely for the client to exist before `:w` races
+it, so format-on-save looks broken in a scripted test while being fine in use.
 
 To test a config change without disturbing the running terminal, launch a
 throwaway instance: `alacritty --config-file <path> -vv`. Add `-vv` to see
