@@ -83,7 +83,17 @@ done
 if [[ -n "$tmux_bin" ]]; then
     # Target each attached client explicitly: spawned from the keybinding we
     # are outside tmux, so there is no "current client" to default to.
+    #
+    # The trailing `|| true` is load-bearing. With no tmux server running,
+    # `list-clients` exits 1, and `set -o pipefail` promotes that to the
+    # pipeline's status — which, being the last command in the script,
+    # became term-theme's exit status. The toggle worked and still reported
+    # failure, so `term-theme light && ...` broke for anything scripted.
     "$tmux_bin" list-clients -F '#{client_name}' 2>/dev/null | while read -r c; do
         "$tmux_bin" display-message -c "$c" "alacritty → $mode" 2>/dev/null || true
-    done
+    done || true
 fi
+
+# Explicit, so that adding any best-effort notification below can never
+# again decide this script's exit status.
+exit 0
