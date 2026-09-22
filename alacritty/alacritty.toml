@@ -45,21 +45,59 @@ history = 10000
 multiplier = 3
 
 # ----- Font -----
-# Swap fonts by changing FAMILY below; Alacritty live-reloads on save.
-# Installed candidates (exact names from `fc-list : family`):
-#   "JetBrainsMono Nerd Font"  - tall x-height, wide, low-fatigue  <- current
-#   "AtkynsonMono Nerd Font"   - Atkinson Hyperlegible, max glyph distinction
-#   "UbuntuMono Nerd Font"     - previous font (narrow, small x-height)
+# Swap fonts by changing the family on all four lines below; Alacritty
+# live-reloads on save. Candidates, with the cask that installs them:
+#   "AtkynsonMono Nerd Font"   font-atkynson-mono-nerd-font   <- current
+#       Nerd Font patch of Atkinson Hyperlegible Mono, designed by the
+#       Braille Institute for low-vision legibility. Unusually distinct
+#       glyph shapes: slashed 0, tailed l, serifed I, very open apertures
+#       on c/e/a/s. No programming ligatures.
+#   "JetBrainsMono Nerd Font"  font-jetbrains-mono-nerd-font  (previous)
+#
+# Verify a family resolves BEFORE trusting it — a family or style Alacritty
+# cannot match falls back to a system font silently, which looks like the
+# config having no effect. There is no `fc-list` on macOS; ask CoreText:
+#   python3 -c 'import ctypes,ctypes.util;ct=ctypes.cdll.LoadLibrary(
+#     ctypes.util.find_library("CoreText"))'  # see git log for the full probe
+# or just launch a throwaway window and look: `alacritty --config-file X -vv`.
 [font]
-size = 18.0
+# Point size is NOT perceived size — x-height is, and Atkynson's is smaller
+# per em than JetBrains Mono's, so the numbers do not transfer between them:
+#
+#            x-height  cap-height  advance  line-height   (per 1000 em)
+#   Atkynson      496         668      632         1197
+#   JetBrains     550         730      600         1320
+#
+# Consequence: 20.0 here is NOT a size increase over the old JetBrains 18.0
+# — it is the number that reproduces it (18 * 550/496 = 19.96). Atkynson at
+# 18.0 would render ~10% smaller than the old font did, despite the
+# "hyperlegible" billing. The legibility win is the glyph shapes, not scale.
+# Don't tune this by eye against the point number; use the x-height column.
+#
+# Measured ladder (Retina logical px, `offset.y = 2` included in the height;
+# column/row counts are for a ~1800x1000px window):
+#
+#   size  x-height  vs JetBrains@18  cell w x h    cols  rows
+#   20.0    9.92px            +0%    12.6 x 25.9    141    38   <- current
+#   22.0   10.91px           +10%    13.9 x 28.3    128    35
+#   23.0   11.41px           +15%    14.5 x 29.5    122    33
+#   24.0   11.90px           +20%    15.2 x 30.7    117    32
+#   26.0   12.90px           +30%    16.4 x 33.1    108    29
+#
+# Atkynson's cells are ~17% wider than JetBrains Mono's at equal x-height,
+# so going up costs columns faster here than it used to. If a side-by-side
+# tmux split stops fitting, step DOWN this ladder rather than cutting
+# `offset.x` — horizontal crowding is the thing that actually hurts to read.
+size = 20.0
 
 # style = "Medium" not "Regular": macOS stopped doing subpixel antialiasing in
 # Mojave, so Regular-weight text renders thin and washed out. Medium compensates.
-# Other available weights: Thin ExtraLight Light Regular Medium SemiBold Bold ExtraBold
-normal = { family = "JetBrainsMono Nerd Font", style = "Medium" }
-bold = { family = "JetBrainsMono Nerd Font", style = "Bold" }
-italic = { family = "JetBrainsMono Nerd Font", style = "Medium Italic" }
-bold_italic = { family = "JetBrainsMono Nerd Font", style = "Bold Italic" }
+# Atkynson ships only Light, Regular, Medium and Bold (plus italics) — it has
+# no SemiBold/ExtraBold, so do not copy those over from a JetBrains config.
+normal = { family = "AtkynsonMono Nerd Font", style = "Medium" }
+bold = { family = "AtkynsonMono Nerd Font", style = "Bold" }
+italic = { family = "AtkynsonMono Nerd Font", style = "Medium Italic" }
+bold_italic = { family = "AtkynsonMono Nerd Font", style = "Bold Italic" }
 
 # Extra breathing room between lines and columns — reduces glyph crowding,
 # which is a bigger eye-strain factor than raw font size.

@@ -132,6 +132,21 @@ To test a config change without disturbing the running terminal, launch a
 throwaway instance: `alacritty --config-file <path> -vv`. Add `-vv` to see
 config load and reload events, which are silent at the default log level.
 
+**A new window (`Cmd+N`, `CreateNewWindow`) does not re-read the config.**
+It is a new window in the *same* process, so it inherits the config already
+in memory. Only the file watcher firing, or fully quitting and relaunching
+Alacritty, picks up an edit. This bites hardest when judging a font or size
+change: the new window looks wrong, the config looks right, and neither is
+lying. Quit and relaunch before concluding a visual change did not work.
+
+For font changes specifically, don't eyeball the point size — measure
+x-height, which is what perceived size actually tracks. Point sizes are not
+comparable across families (Atkynson's x-height is 496/1000 em, JetBrains
+Mono's is 550), so a same-number swap silently resizes the terminal. macOS
+has no `fc-list`; ask CoreText via `CTFontGetXHeight`, and note it also
+reveals whether a family/style pair resolves at all — an unmatched one falls
+back to a system font with no error.
+
 ## Conventions
 
 - Don't commit or push unless asked.

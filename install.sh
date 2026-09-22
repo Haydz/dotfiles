@@ -123,22 +123,26 @@ else
     missing_required=$((missing_required + 1))
 fi
 
+# Keep this name in sync with the `family` in alacritty/alacritty.toml.
+# The filenames on disk have no space ("AtkynsonMonoNerdFont-Medium.otf")
+# while the family Alacritty matches on does ("AtkynsonMono Nerd Font"), so
+# the two branches below deliberately grep for different strings.
 # No fc-list on macOS, so look in the font directories directly.
 font_found=0
 if command -v fc-list >/dev/null 2>&1; then
-    fc-list : family 2>/dev/null | grep -qi "JetBrainsMono Nerd Font" && font_found=1
+    fc-list : family 2>/dev/null | grep -qi "AtkynsonMono Nerd Font" && font_found=1
 else
     for d in "$HOME/Library/Fonts" /Library/Fonts /System/Library/Fonts; do
         [ -d "$d" ] || continue
-        ls "$d" 2>/dev/null | grep -qi "JetBrainsMono" && { font_found=1; break; }
+        ls "$d" 2>/dev/null | grep -qi "AtkynsonMono" && { font_found=1; break; }
     done
 fi
 if [ "$font_found" -eq 1 ]; then
-    echo "  ✓ JetBrainsMono Nerd Font"
+    echo "  ✓ AtkynsonMono Nerd Font"
 else
-    echo "  ✗ JetBrainsMono Nerd Font — alacritty.toml names it; without it"
+    echo "  ✗ AtkynsonMono Nerd Font — alacritty.toml names it; without it"
     echo "      the terminal silently falls back to a default font"
-    hint "brew install --cask font-jetbrains-mono-nerd-font" \
+    hint "brew install --cask font-atkynson-mono-nerd-font" \
          "see README.md for the per-distro font install"
     missing_required=$((missing_required + 1))
 fi

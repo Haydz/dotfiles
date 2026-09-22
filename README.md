@@ -78,7 +78,7 @@ Required:
 - Alacritty 0.13+ (TOML config)
 - tmux 3.1+ (for the `~/.config/tmux/` path)
 - A C compiler — nvim-treesitter compiles parsers on install
-- JetBrains Mono Nerd Font
+- AtkynsonMono Nerd Font
 - Lazy.nvim (auto-installed by the Neovim config)
 
 Optional — Neovim starts fine without these, the matching feature is just
@@ -96,22 +96,41 @@ inert:
 
 ### Fonts
 
+`alacritty.toml` names **`AtkynsonMono Nerd Font`**. Mind the three
+different spellings of the same thing — they are not typos:
+
+| | |
+|---|---|
+| Homebrew cask | `font-atkynson-mono-nerd-font` |
+| Nerd Fonts release asset | `AtkinsonHyperlegibleMono.zip` (**i**, not **y**) |
+| Family Alacritty matches on | `AtkynsonMono Nerd Font` (**y**, with a space) |
+
 ```bash
 # macOS
-brew install --cask font-jetbrains-mono-nerd-font
+brew install --cask font-atkynson-mono-nerd-font
 
-# Arch
-sudo pacman -S ttf-jetbrains-mono-nerd
-
-# Debian/Ubuntu/other — no distro package, install to the user font dir
+# Linux — no distro package in any repo (not Arch, not Debian), and the
+# release asset is spelled differently from the family it installs.
 mkdir -p ~/.local/share/fonts && cd ~/.local/share/fonts
-curl -fLO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
-unzip -o JetBrainsMono.zip && rm JetBrainsMono.zip && fc-cache -f
+curl -fLO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/AtkinsonHyperlegibleMono.zip
+unzip -o AtkinsonHyperlegibleMono.zip && rm AtkinsonHyperlegibleMono.zip && fc-cache -f
 ```
 
-Optional alternative, designed by the Braille Institute for legibility —
-swap the `family` in `alacritty/alacritty.toml` to `AtkynsonMono Nerd Font`:
+Confirm it actually resolved, rather than trusting that it installed —
+a family Alacritty cannot match falls back to a system font *silently*:
 
 ```bash
-brew install --cask font-atkynson-mono-nerd-font   # macOS
+fc-list : family | grep -i atkynson          # Linux
+./install.sh --check | grep -i atkynson      # either platform
+```
+
+Previous font, still a good choice and the one to fall back to if you want
+narrower columns — swap the `family` on all four lines in
+`alacritty/alacritty.toml`. Note the size does **not** carry over: match
+x-height, not point size, so the equivalent of Atkynson at `20.0` is
+JetBrains Mono at `18.0` (see the ladder in that file):
+
+```bash
+brew install --cask font-jetbrains-mono-nerd-font   # macOS
+sudo pacman -S ttf-jetbrains-mono-nerd              # Arch
 ```
