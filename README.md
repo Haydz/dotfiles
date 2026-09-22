@@ -47,8 +47,12 @@ ln -s ~/dotfiles/bin/term-theme ~/.local/bin/term-theme
 
 ## Terminal theme
 
-Alacritty is tuned for readability: JetBrains Mono Medium, and light/dark
-themes whose colours all clear the WCAG AAA 7:1 contrast bar.
+Alacritty is tuned for readability: Atkinson Hyperlegible Mono Medium — the
+Braille Institute's low-vision typeface — and light/dark themes whose colours
+are generated against measured contrast rather than borrowed from a theme
+gallery. All body text clears the WCAG AAA 7:1 bar; the dim tier has its own
+lower floors on purpose, since a comment colour you can't de-emphasise is
+its own readability problem.
 
 Switch between them with `term-theme`, or with a keybinding:
 
@@ -56,16 +60,31 @@ Switch between them with `term-theme`, or with a keybinding:
 |---|---|
 | `term-theme` | toggle |
 | `term-theme light` | white-ish bg, matches a bright browser beside the terminal |
-| `term-theme dark` | Catppuccin Mocha |
+| `term-theme dark` | dark neutral, generated palette |
 | `term-theme status` | print current mode |
 | `Cmd+Shift+T` / `Ctrl+Shift+T` | toggle (macOS / Linux) |
 
 Both themes carry a documented ladder of background shades in their header
 comments, with measured contrast values, if you want to tune brightness.
+If you change a colour, re-run the audit rather than trusting the comment:
 
-Note: after editing `theme-light.toml` or `theme-dark.toml` directly, toggle
-twice to apply. Alacritty builds its config file-watch list at startup, so
-imports are only live-reloaded once they existed when Alacritty launched.
+```bash
+term-contrast            # full table for both themes
+term-contrast --quiet    # failures only; exits non-zero
+```
+
+Changing the background means re-solving every colour against it — contrast
+is a property of a *pair*, so no hex value is portable between backgrounds.
+
+Editing `theme-light.toml` or `theme-dark.toml` directly applies straight
+away — they are imported, and Alacritty watches imported files as well as
+`alacritty.toml`. The startup caveat only affects a theme file that did
+*not* exist when Alacritty launched: it never enters the watch list, so it
+stays inert until a restart.
+
+What genuinely does not pick up a change is a **new window** (`Cmd+N`) —
+that shares the running process's in-memory config. Quit and relaunch when
+a font or colour change looks like it did nothing.
 
 ## Requirements
 
@@ -78,7 +97,7 @@ Required:
 - Alacritty 0.13+ (TOML config)
 - tmux 3.1+ (for the `~/.config/tmux/` path)
 - A C compiler — nvim-treesitter compiles parsers on install
-- JetBrains Mono Nerd Font
+- AtkynsonMono Nerd Font
 - Lazy.nvim (auto-installed by the Neovim config)
 
 Optional — Neovim starts fine without these, the matching feature is just
@@ -96,22 +115,41 @@ inert:
 
 ### Fonts
 
+`alacritty.toml` names **`AtkynsonMono Nerd Font`**. Mind the three
+different spellings of the same thing — they are not typos:
+
+| | |
+|---|---|
+| Homebrew cask | `font-atkynson-mono-nerd-font` |
+| Nerd Fonts release asset | `AtkinsonHyperlegibleMono.zip` (**i**, not **y**) |
+| Family Alacritty matches on | `AtkynsonMono Nerd Font` (**y**, with a space) |
+
 ```bash
 # macOS
-brew install --cask font-jetbrains-mono-nerd-font
+brew install --cask font-atkynson-mono-nerd-font
 
-# Arch
-sudo pacman -S ttf-jetbrains-mono-nerd
-
-# Debian/Ubuntu/other — no distro package, install to the user font dir
+# Linux — no distro package in any repo (not Arch, not Debian), and the
+# release asset is spelled differently from the family it installs.
 mkdir -p ~/.local/share/fonts && cd ~/.local/share/fonts
-curl -fLO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
-unzip -o JetBrainsMono.zip && rm JetBrainsMono.zip && fc-cache -f
+curl -fLO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/AtkinsonHyperlegibleMono.zip
+unzip -o AtkinsonHyperlegibleMono.zip && rm AtkinsonHyperlegibleMono.zip && fc-cache -f
 ```
 
-Optional alternative, designed by the Braille Institute for legibility —
-swap the `family` in `alacritty/alacritty.toml` to `AtkynsonMono Nerd Font`:
+Confirm it actually resolved, rather than trusting that it installed —
+a family Alacritty cannot match falls back to a system font *silently*:
 
 ```bash
-brew install --cask font-atkynson-mono-nerd-font   # macOS
+fc-list : family | grep -i atkynson          # Linux
+./install.sh --check | grep -i atkynson      # either platform
+```
+
+Previous font, still a good choice and the one to fall back to if you want
+narrower columns — swap the `family` on all four lines in
+`alacritty/alacritty.toml`. Note the size does **not** carry over: match
+x-height, not point size, so the equivalent of Atkynson at `20.0` is
+JetBrains Mono at `18.0` (see the ladder in that file):
+
+```bash
+brew install --cask font-jetbrains-mono-nerd-font   # macOS
+sudo pacman -S ttf-jetbrains-mono-nerd              # Arch
 ```

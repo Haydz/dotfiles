@@ -22,3 +22,7 @@ lua/core/test
 
 # Tool logs
 .nvimlog
+
+# Byte cache from `python3 -m py_compile bin/term-contrast` (see AGENTS.md)
+__pycache__/
+*.pyc

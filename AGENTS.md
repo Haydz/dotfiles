@@ -43,9 +43,33 @@ Patterns already used here, reuse them rather than reinventing:
 | `tmux/` | `~/.config/tmux` | needs tmux 3.1+ for this path |
 | `bin/` | each file into `~/.local/bin` | already on `PATH` |
 
+`install.sh` links **every** file in `bin/` into `~/.local/bin`, so anything
+dropped there becomes a user-facing command — not a scratch directory.
+Current contents:
+
+| Script | | |
+|---|---|---|
+| `term-theme` | bash | flips Alacritty light/dark |
+| `term-contrast` | python **3.11+** (needs `tomllib`) | audits theme contrast |
+
+`term-contrast` exits with a clear message on older Python rather than a
+traceback, and `install.sh --check` covers it as an *optional* dep — the
+terminal and editor do not depend on it, only the contrast audit does.
+
+That check tests the capability (`python3 -c 'import tomllib'`), not a
+version string, for two reasons worth preserving: `python3 --version`
+output carries distro suffixes that break parsing (`3.11.2+`,
+`3.9.6 (default, ...)`), and a `python3.12` binary is often installed while
+`python3` still resolves to something older — the exact case a version
+check is supposed to catch. When `python3` is too old it also looks for a
+newer versioned binary already on `PATH` and names it, since that is
+usually cheaper than installing anything.
+
 `alacritty/themes/` is a vendored copy of the alacritty-theme collection,
 tracked as plain files (not a submodule). `theme-light.toml` and
-`theme-dark.toml` are standalone — they do **not** import from `themes/`.
+`theme-dark.toml` are standalone — they do **not** import from `themes/`,
+and neither is an upstream theme any more: the dark one is generated, the
+light one started from GitHub Light High Contrast and was re-solved.
 
 ## Alacritty theming
 
@@ -63,13 +87,64 @@ line in place. Three non-obvious reasons it works the way it does:
    theme files; a global substitution corrupts them, and then reading the mode
    back returns documentation instead of configuration.
 
-Corollary for anyone editing `theme-*.toml` directly: the change will not
-appear until you toggle twice, or restart Alacritty.
+Note the scope of point 1: it is about a file that **did not exist at
+startup**. A `theme-*.toml` that *was* present when Alacritty launched is in
+the watch list and live-reloads on edit like any other config file. Verified
+with `-vv` — `touch alacritty/theme-dark.toml` logs a reload immediately:
 
-Colours are chosen against measured WCAG contrast, and both themes keep every
-ANSI colour at or above the 7:1 AAA bar. Each theme file carries a ladder of
-alternative background shades with measured values in its header comment.
-If you change a colour, recompute — don't eyeball it.
+```
+Configuration files loaded from:
+  "~/.config/alacritty/alacritty.toml"
+  "~/.config/alacritty/theme-dark.toml"      <- imports are watched too
+[5.003s] Reloading configuration file: ".../alacritty/alacritty.toml"
+```
+
+This corrects an earlier claim here that editing `theme-*.toml` required
+toggling twice or restarting. It does not. See "Lessons learned" — that
+claim was asserted rather than measured, and was wrong for the same reason
+the contrast claim below was.
+
+## Alacritty colours: run the audit, don't trust the comment
+
+Both themes are generated against measured contrast rather than inherited
+from an upstream theme. **`bin/term-contrast` is the source of truth** —
+run it after touching any colour:
+
+```bash
+./bin/term-contrast          # full table, both themes
+./bin/term-contrast --quiet  # failures only, exits non-zero
+```
+
+This tool exists because the previous claim here — "both themes keep every
+ANSI colour at or above the 7:1 AAA bar" — was false in both themes:
+
+- the light theme's grey carried a comment asserting 7.0:1. That was
+  measured against `#ffffff`; against the `#e0e4ec` actually in use it was
+  **5.51:1**, and ANSI cyan sat at **3.87:1**, below even AA.
+- the dark theme (Catppuccin Mocha) had ANSI black at **1.80:1** —
+  invisible — which is the slot ls, git, delta, bat and most prompts use
+  for comments. Its `normal` and `bright` were also byte-identical for all
+  six hues, so no program could render emphasis.
+
+Two rules follow, and they are why copying values from a theme gallery
+does not work here:
+
+1. **Contrast is a property of a pair.** A hex value is not "AAA"; it is
+   AAA *against one background*. Change the background and every colour
+   needs re-solving. Nothing transfers.
+2. **The policy is not "everything at AAA".** A terminal needs a readable
+   dim tier — comments that cannot be de-emphasised are their own
+   legibility problem — so the dim slots have deliberately lower floors.
+   `term-contrast` encodes the per-slot floors; edit them there, in one
+   place, rather than arguing with the numbers in a file comment.
+
+Note the two themes move in opposite directions: on the dark theme
+`bright` is *lighter* than `normal`, on the light theme it is *darker*,
+because on a light ground lighter means less contrast.
+
+Each theme file also carries a ladder of alternative background shades with
+measured values in its header comment. If you change a colour, recompute —
+don't eyeball it.
 
 ## Neovim: two lazy.nvim traps that fail silently
 
@@ -105,7 +180,10 @@ on every startup.
 
 ```bash
 bash -n install.sh bin/term-theme                  # shell syntax
+python3 -m py_compile bin/term-contrast            # python syntax
 python3 -c "import tomllib,sys; [tomllib.load(open(f,'rb')) for f in sys.argv[1:]]" alacritty/*.toml
+./bin/term-contrast --quiet                        # theme contrast floors
+./bin/term-theme status >/dev/null; echo "exit=$?" # must be 0, see bin/ notes
 tmux -L test new-session -d 'read x'; tmux -L test show -g mouse; tmux -L test kill-server
 ./install.sh --check                               # every binary the config needs
 nvim --headless +qa                                # startup errors (silence = clean)
@@ -131,6 +209,81 @@ it, so format-on-save looks broken in a scripted test while being fine in use.
 To test a config change without disturbing the running terminal, launch a
 throwaway instance: `alacritty --config-file <path> -vv`. Add `-vv` to see
 config load and reload events, which are silent at the default log level.
+
+**A new window (`Cmd+N`, `CreateNewWindow`) does not re-read the config.**
+It is a new window in the *same* process, so it inherits the config already
+in memory. Only the file watcher firing, or fully quitting and relaunching
+Alacritty, picks up an edit. This bites hardest when judging a font or size
+change: the new window looks wrong, the config looks right, and neither is
+lying. Quit and relaunch before concluding a visual change did not work.
+
+For font changes specifically, don't eyeball the point size — measure
+x-height, which is what perceived size actually tracks. Point sizes are not
+comparable across families (Atkynson's x-height is 496/1000 em, JetBrains
+Mono's is 550), so a same-number swap silently resizes the terminal. macOS
+has no `fc-list`; ask CoreText via `CTFontGetXHeight`, and note it also
+reveals whether a family/style pair resolves at all — an unmatched one falls
+back to a system font with no error.
+
+## Shell scripts in `bin/`: the last command sets the exit status
+
+These scripts run `set -euo pipefail`, which means **the script's exit
+status is whatever the last command returned** — including a trailing
+best-effort step that nobody intended to be load-bearing.
+
+`term-theme` ended with an optional tmux notification. With no tmux server
+running, `tmux list-clients` exits 1; `pipefail` promoted that to the
+pipeline's status, and being last, it became the script's status. So
+`term-theme light` wrote the config correctly, printed success, and exited
+**1** — breaking `term-theme light && ...` for anything scripted. The
+keybinding path hid it completely, because Alacritty discards the output.
+
+Two rules:
+
+- End these scripts with an explicit `exit 0` after the real work, so no
+  notification or cleanup added later can decide the status.
+- Put `|| true` on best-effort pipelines, not just on the commands inside
+  them. `cmd 2>/dev/null | while ...; do x || true; done` still fails when
+  `cmd` fails — the `|| true` has to be on the pipeline.
+
+Check exit codes, not just output, when testing a `bin/` script:
+
+```bash
+./bin/term-theme light; echo "exit=$?"   # a working switch must be 0
+```
+
+## Lessons learned
+
+Recorded because each of these cost real time here, and none announced
+itself as an error.
+
+1. **A claim in a comment is not a verification.** Two assertions in this
+   file were simply false: that both themes cleared 7:1 (ANSI black was at
+   1.80:1, light cyan at 3.87:1) and that editing `theme-*.toml` needed a
+   double toggle (imports are watched; it reloads). Both read as settled
+   fact. If an invariant matters, encode it in something runnable and list
+   it under "Verifying changes" — that is what `bin/term-contrast` is for.
+2. **Contrast and font size are properties of a relationship, not of a
+   value.** A hex is only AAA *against one background*; a point size only
+   looks right *for one font's x-height*. The light theme's grey really was
+   7.0:1 — against `#ffffff`, which had stopped being the background.
+   Nothing copied from an upstream theme or another font transfers.
+3. **Reputation is not measurement.** Atkinson Hyperlegible is a
+   legibility typeface, and its x-height is *smaller* than JetBrains
+   Mono's (496 vs 550 per em). Swapping families at the same point size
+   made the terminal smaller while "improving legibility".
+4. **Ask the renderer, not the file.** An OS/2 table, CoreText, and
+   Alacritty can disagree. CoreText is what actually resolves a
+   family/style pair, and an unmatched one falls back to a system font
+   silently. `alacritty --config-file X -vv` is what proves a font loaded.
+5. **Confirm the process re-read the config before judging a visual
+   change.** A new window is not a reload (see "Verifying changes"). A
+   change that looks like it did nothing is usually being viewed through a
+   stale process.
+6. **Fix the target, not just the arithmetic.** The first font attempt was
+   measured correctly and still wrong, because it aimed to *preserve* the
+   old apparent size when the request was to increase it. Correct maths
+   against the wrong goal still fails.
 
 ## Conventions
 

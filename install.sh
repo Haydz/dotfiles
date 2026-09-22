@@ -123,24 +123,57 @@ else
     missing_required=$((missing_required + 1))
 fi
 
+# Keep this name in sync with the `family` in alacritty/alacritty.toml.
+# The filenames on disk have no space ("AtkynsonMonoNerdFont-Medium.otf")
+# while the family Alacritty matches on does ("AtkynsonMono Nerd Font"), so
+# the two branches below deliberately grep for different strings.
 # No fc-list on macOS, so look in the font directories directly.
 font_found=0
 if command -v fc-list >/dev/null 2>&1; then
-    fc-list : family 2>/dev/null | grep -qi "JetBrainsMono Nerd Font" && font_found=1
+    fc-list : family 2>/dev/null | grep -qi "AtkynsonMono Nerd Font" && font_found=1
 else
     for d in "$HOME/Library/Fonts" /Library/Fonts /System/Library/Fonts; do
         [ -d "$d" ] || continue
-        ls "$d" 2>/dev/null | grep -qi "JetBrainsMono" && { font_found=1; break; }
+        ls "$d" 2>/dev/null | grep -qi "AtkynsonMono" && { font_found=1; break; }
     done
 fi
 if [ "$font_found" -eq 1 ]; then
-    echo "  ✓ JetBrainsMono Nerd Font"
+    echo "  ✓ AtkynsonMono Nerd Font"
 else
-    echo "  ✗ JetBrainsMono Nerd Font — alacritty.toml names it; without it"
+    echo "  ✗ AtkynsonMono Nerd Font — alacritty.toml names it; without it"
     echo "      the terminal silently falls back to a default font"
-    hint "brew install --cask font-jetbrains-mono-nerd-font" \
+    hint "brew install --cask font-atkynson-mono-nerd-font" \
          "see README.md for the per-distro font install"
     missing_required=$((missing_required + 1))
+fi
+
+# bin/term-contrast needs `tomllib`, which is stdlib from python 3.11 only.
+# Optional, not required: nothing about the terminal or editor depends on it,
+# it is the theme-contrast audit that stops working.
+#
+# Test the capability rather than the version. Parsing `python3 --version`
+# breaks on distro suffixes ("3.11.2+", "3.9.6 (default, ...)"), and a
+# python3.11 binary can be installed while `python3` still resolves to
+# something older — which is exactly the case that would slip through.
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "  · python3 — bin/term-contrast audits the theme contrast floors"
+    hint "brew install python" "your package manager: python3 (3.11+)"
+    missing_optional=$((missing_optional + 1))
+elif python3 -c 'import tomllib' >/dev/null 2>&1; then
+    echo "  ✓ python3 $(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])') (term-contrast)"
+else
+    pyver=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || echo "?")
+    echo "  · python3 is $pyver — term-contrast needs 3.11+ for tomllib"
+    # A newer interpreter is often already installed under a versioned name
+    # even when `python3` is not it; point at it rather than a fresh install.
+    for p in python3.14 python3.13 python3.12 python3.11; do
+        if command -v "$p" >/dev/null 2>&1; then
+            echo "      $p is on PATH — run: $p bin/term-contrast"
+            break
+        fi
+    done
+    hint "brew install python" "your package manager: python3.11 or newer"
+    missing_optional=$((missing_optional + 1))
 fi
 
 echo
