@@ -1,0 +1,56 @@
+# zsh environment — linked to ~/.zshenv by install.sh
+#
+# Read by EVERY zsh: login, interactive, and non-interactive `zsh -c`. That
+# last case is the whole reason this file exists, so keep it minimal — no
+# command lookups, no subshells, nothing that costs time on a script that
+# only wanted to run one line. Interactive-only setup belongs in zshrc.
+#
+# vim: ft=zsh
+
+# ---------------------------------------------------------------- gitsign ---
+
+# Commit signing at Chainguard uses gitsign, configured in ~/.gitconfig
+# (gpg.format=x509, gpg.x509.program=gitsign). Two of its settings have no
+# git-config equivalent and can only be set here, as environment variables.
+#
+# These are in zshenv rather than zshrc because zshrc is skipped for
+# non-interactive shells, and git does not run gitsign from an interactive
+# one. With them in zshrc, a commit made from a git hook, a script, an editor
+# or an agent would silently sign in online mode with no credential cache —
+# the failure is invisible until a verify breaks or you get a browser tab per
+# commit during a rebase.
+
+# online mode stores commit SHAs in Rekor and needs a network round trip to
+# verify every commit object; offline stores the Rekor attributes in the
+# commit itself. online is also the source of sporadic verification failures,
+# and upstream plans to deprecate it.
+export GITSIGN_REKOR_MODE=offline
+
+# Path to the gitsign-credential-cache socket. Without it, every signature
+# needs a fresh browser auth, which makes `git rebase` over more than a
+# couple of commits unusable. The cache holds credentials for their full
+# ~10 minute lifetime.
+#
+# The daemon that creates this socket is separate — on macOS it is a
+# LaunchAgent at ~/Library/LaunchAgents/dev.sigstore.gitsign-credential-cache.plist;
+# on Linux, `gitsign-credential-cache` run under systemd --user. If it is not
+# running, gitsign falls back to interactive auth rather than failing.
+#
+# gitsign derives the path from Go's os.UserCacheDir, which differs by
+# platform, so mirror that here instead of hardcoding the macOS location.
+if [[ -n ${XDG_CACHE_HOME-} ]]; then
+    export GITSIGN_CREDENTIAL_CACHE="$XDG_CACHE_HOME/sigstore/gitsign/cache.sock"
+elif [[ $OSTYPE == darwin* ]]; then
+    export GITSIGN_CREDENTIAL_CACHE="$HOME/Library/Caches/sigstore/gitsign/cache.sock"
+else
+    export GITSIGN_CREDENTIAL_CACHE="$HOME/.cache/sigstore/gitsign/cache.sock"
+fi
+
+# ------------------------------------------------------- machine overrides ---
+
+# Secrets and per-machine values that should not be in a public repo. Sourced
+# last so it can override anything above. Usually absent — see the note at
+# the bottom of zshrc for why the `true` matters.
+[[ -r "$HOME/.zshenv.local" ]] && source "$HOME/.zshenv.local"
+
+true

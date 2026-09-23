@@ -1,0 +1,23 @@
+# zsh login-shell configuration — linked to ~/.zprofile by install.sh
+#
+# Runs once per login shell, before ~/.zshrc. Only things that belong to the
+# session rather than the interactive shell go here — PATH from package
+# managers, and nothing that prints.
+#
+# vim: ft=zsh
+
+# Homebrew installs to a different prefix on every platform, and `brew
+# shellenv` is what sets PATH, MANPATH, INFOPATH and HOMEBREW_PREFIX (which
+# zshrc reads to find completions). The generated snippet hardcodes one
+# prefix; use an ordered fallback instead so the same file works on Apple
+# Silicon, Intel macOS and Linuxbrew.
+for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew; do
+    if [[ -x $_brew ]]; then
+        eval "$("$_brew" shellenv zsh)"
+        break
+    fi
+done
+unset _brew
+
+# Anything machine-specific that must exist before ~/.zshrc runs.
+[[ -r "$HOME/.zprofile.local" ]] && source "$HOME/.zprofile.local"

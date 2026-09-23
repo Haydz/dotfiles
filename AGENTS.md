@@ -4,10 +4,11 @@ Guidance for AI agents working in this repo.
 
 ## What this is
 
-Personal dotfiles for Neovim, Alacritty and tmux. Config is symlinked into
-place by `install.sh` — the repo is the source of truth, and `~/.config/nvim`,
-`~/.config/alacritty` and `~/.config/tmux` are symlinks to directories here.
-Editing either path touches the same file.
+Personal dotfiles for Neovim, Alacritty, tmux and zsh. Config is symlinked
+into place by `install.sh` — the repo is the source of truth, and
+`~/.config/nvim`, `~/.config/alacritty`, `~/.config/tmux`, `~/.zshrc`,
+`~/.zprofile` and `~/.zshenv` are symlinks to files here. Editing either
+path touches the same file.
 
 ## The one hard constraint: macOS *and* Linux
 
@@ -41,7 +42,14 @@ Patterns already used here, reuse them rather than reinventing:
 | `nvim/` | `~/.config/nvim` | lazy.nvim |
 | `alacritty/` | `~/.config/alacritty` | see below |
 | `tmux/` | `~/.config/tmux` | needs tmux 3.1+ for this path |
+| `zsh/zshenv` | `~/.zshenv` | **every** zsh, including `zsh -c` |
+| `zsh/zprofile` | `~/.zprofile` | login shell; sets `HOMEBREW_PREFIX` |
+| `zsh/zshrc` | `~/.zshrc` | interactive shell |
 | `bin/` | each file into `~/.local/bin` | already on `PATH` |
+
+The three zsh files land in `$HOME`, not `$XDG_CONFIG_HOME`, because zsh
+only looks at `$ZDOTDIR` — and setting that before login needs
+`/etc/zshenv`, which is outside this repo.
 
 `install.sh` links **every** file in `bin/` into `~/.local/bin`, so anything
 dropped there becomes a user-facing command — not a scratch directory.
@@ -176,10 +184,76 @@ the pin only together with rewriting that file.
 without the gate a machine that has not synced the vault gets an error box
 on every startup.
 
+## zsh: six things that fail quietly
+
+`zsh/zshrc` is builtins only — no framework, no plugin manager, no prompt
+binary — and that is a constraint to preserve, not an accident. These are
+also the files most likely to break in a way you only notice three sessions
+later, because nothing in a shell startup reports an error you can't see.
+
+1. **`${VAR:+...}` ends at the first `}`, and `%F{yellow}` supplies one.**
+   `PROMPT='${SSH_CONNECTION:+%F{yellow}%n@%m%f }...'` does not do what it
+   reads as: the conditional closes after `yellow`, and `%n@%m%f }` falls
+   outside it, so every local prompt printed `user@host` and a stray ` }`.
+   Build anything containing a colour escape *outside* the prompt string —
+   it is static per session anyway.
+
+2. **The last line of `zshrc` sets `$?` for the first prompt.** The file
+   ends with `[[ -r ~/.zshrc.local ]] && source ...`, which fails on any
+   machine without that file. The prompt then drew its red `1 ❯` failure
+   marker on a brand-new shell, and `zsh -ic exit` returned 1. Hence the
+   bare `true` at the bottom. Same trap as `bin/term-theme` below — check
+   `zsh -ic exit; echo $?` after touching the end of that file.
+
+3. **`local x=$(cmd)` discards `cmd`'s exit status** — the status is
+   `local`'s, which is always 0. `+vi-git-ahead-behind` declares and
+   assigns on separate lines for exactly this reason; collapse them and the
+   no-upstream case stops returning early and reads a garbage count.
+
+4. **`compinit -C` trusts a dump up to 24 hours stale.** That is what keeps
+   startup near 50 ms with Homebrew's ~100 completion files on `fpath`, and
+   the cost is that a completion installed today may not appear until
+   tomorrow. Before concluding a tool ships no completion:
+   `rm -f ~/.cache/zsh/zcompdump-* && exec zsh -l`.
+
+5. **`extended_glob` is why `no_nomatch` is set.** `extended_glob` makes
+   `^` a pattern character, and zsh's default aborts a command whose glob
+   matched nothing — so `git show HEAD^` fails with "no matches found"
+   before git runs at all, as does any unquoted URL with a `?`. The two
+   options are a pair; dropping `no_nomatch` breaks ordinary git usage.
+
+6. **`zshrc` is not read by `zsh -c`.** Which of the three files a setting
+   goes in is a correctness question, not tidiness. `zshenv` is read by
+   every zsh, `zprofile` only by login shells, `zshrc` only by interactive
+   ones — so an environment variable that a git hook, a script, an editor
+   or an agent depends on is *inert* in `zshrc`, while still looking
+   correct in your own terminal. That is why `GITSIGN_REKOR_MODE` and
+   `GITSIGN_CREDENTIAL_CACHE` are in `zshenv`: git never invokes gitsign
+   from an interactive shell, so in `zshrc` every scripted commit would
+   silently sign in online mode with no credential cache. The flip side:
+   `zshenv` runs on every `zsh -c`, so it must stay free of command
+   lookups and subshells.
+
+The prompt uses ANSI slot names (`%F{magenta}`), never hex, so it follows
+`term-theme` light/dark — the same palette `bin/term-contrast` holds to a
+contrast floor. A hex colour here would look correct in one theme and
+disappear in the other. This is the contrast rule above applied to the
+shell: the prompt's legibility is a property of the pair, so let the
+terminal supply one half of it.
+
+Costs worth knowing before adding to the prompt: `check-for-changes` stats
+the whole worktree on every prompt, and the untracked hook uses
+`git ls-files --error-unmatch`, which exits as soon as one untracked path
+exists, rather than `git status | grep '??'`, which formats the entire
+status first. `git rev-list --count` for ahead/behind only walks commit
+objects, so it is cheap. The escape hatch for a huge repo is
+`zstyle ':vcs_info:*' disable-patterns`, not turning the indicator off.
+
 ## Verifying changes
 
 ```bash
 bash -n install.sh bin/term-theme                  # shell syntax
+zsh -n zsh/zshrc zsh/zprofile zsh/zshenv           # zsh syntax
 python3 -m py_compile bin/term-contrast            # python syntax
 python3 -c "import tomllib,sys; [tomllib.load(open(f,'rb')) for f in sys.argv[1:]]" alacritty/*.toml
 ./bin/term-contrast --quiet                        # theme contrast floors
@@ -188,6 +262,29 @@ tmux -L test new-session -d 'read x'; tmux -L test show -g mouse; tmux -L test k
 ./install.sh --check                               # every binary the config needs
 nvim --headless +qa                                # startup errors (silence = clean)
 ```
+
+A zsh change has to be tested in a *real* interactive startup, in a
+throwaway `$ZDOTDIR` so a broken file cannot lock you out of your own
+shell. `zsh -n` only parses; most of what breaks here is runtime:
+
+```bash
+T=$(mktemp -d); for f in zshrc zprofile zshenv; do cp "zsh/$f" "$T/.$f"; done
+ZDOTDIR="$T" zsh -lic exit; echo "exit=$?"     # must be 0, and print nothing
+for i in 1 2 3; do /usr/bin/time -p env ZDOTDIR="$T" zsh -lic exit; done 2>&1 |
+    awk '/real/{print $2"s"}'                  # ~0.05s; a regression is obvious
+```
+
+The prompt itself needs a pty — `print -P $PROMPT` will not show you what a
+real session draws, and neither will a non-interactive shell:
+
+```bash
+printf 'false\nexit\n' | ZDOTDIR="$T" script -q /dev/null zsh -li |
+    sed 's/\x1b\[[0-9;]*m/|/g' | cat -v       # `|` marks each colour change
+```
+
+Read that output for what should *not* be there as much as what should: the
+`${VAR:+...}` bug above showed up as a `user@host` and a stray ` }` on a
+local shell, and neither is an error.
 
 Assert on behaviour, not on the plugin being in the spec — the traps above
 all leave the spec looking correct. To check a language server really
@@ -280,7 +377,12 @@ itself as an error.
    change.** A new window is not a reload (see "Verifying changes"). A
    change that looks like it did nothing is usually being viewed through a
    stale process.
-6. **Fix the target, not just the arithmetic.** The first font attempt was
+6. **Some bugs only exist in a pty.** Both zsh prompt bugs above —
+   `user@host` on a local shell, and a red `1 ❯` on a brand-new one — were
+   invisible to `zsh -n` and to `print -P`, and appeared on the first
+   `script -q /dev/null zsh -li` run. A config that loads without
+   complaint has not been tested; drive the thing the way a person does.
+7. **Fix the target, not just the arithmetic.** The first font attempt was
    measured correctly and still wrong, because it aimed to *preserve* the
    old apparent size when the request was to increase it. Correct maths
    against the wrong goal still fails.
