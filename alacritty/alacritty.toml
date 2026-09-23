@@ -79,7 +79,7 @@ multiplier = 3
 # column/row counts are for a ~1800x1000px window):
 #
 #   size  x-height  vs JetBrains@18  cell w x h    cols  rows
-#   19.0    9.42px            -5%    12.0 x 24.7    148    40   <- current
+#   19.0    9.42px            -5%    12.0 x 24.7    148    40
 #   20.0    9.92px            +0%    12.6 x 25.9    141    38
 #   22.0   10.91px           +10%    13.9 x 28.3    128    35
 #   23.0   11.41px           +15%    14.5 x 29.5    122    33
@@ -90,7 +90,10 @@ multiplier = 3
 # so going up costs columns faster here than it used to. If a side-by-side
 # tmux split stops fitting, step DOWN this ladder rather than cutting
 # `offset.x` — horizontal crowding is the thing that actually hurts to read.
-size = 19.0
+#
+# Current setting is 17.0 — one step below the measured range above, so the
+# numbers in the ladder don't cover it. Re-measure before quoting cols/rows.
+size = 17.0
 
 # style = "Medium" not "Regular": macOS stopped doing subpixel antialiasing in
 # Mojave, so Regular-weight text renders thin and washed out. Medium compensates.
