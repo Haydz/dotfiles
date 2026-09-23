@@ -1,6 +1,6 @@
 # Dotfiles
 
-My personal configuration files for Neovim and Alacritty.
+My personal configuration files for Neovim, Alacritty and zsh.
 
 Works on macOS and Linux — no absolute platform paths in any config.
 
@@ -9,6 +9,7 @@ Works on macOS and Linux — no absolute platform paths in any config.
 - `nvim/` - Neovim configuration
 - `alacritty/` - Alacritty terminal configuration
 - `tmux/` - tmux configuration (mouse scrolling enabled)
+- `zsh/` - shell configuration, symlinked to `~/.zshrc`, `~/.zprofile` and `~/.zshenv`
 - `bin/` - scripts, symlinked into `~/.local/bin`
 
 ## Installation
@@ -43,7 +44,131 @@ ln -s ~/dotfiles/nvim ~/.config/nvim
 ln -s ~/dotfiles/alacritty ~/.config/alacritty
 ln -s ~/dotfiles/tmux ~/.config/tmux
 ln -s ~/dotfiles/bin/term-theme ~/.local/bin/term-theme
+ln -s ~/dotfiles/zsh/zshrc ~/.zshrc
+ln -s ~/dotfiles/zsh/zprofile ~/.zprofile
+ln -s ~/dotfiles/zsh/zshenv ~/.zshenv
 ```
+
+## Shell
+
+`zsh/zshrc` uses zsh builtins only — no framework, no plugin manager, no
+prompt binary — so a fresh clone works immediately on any machine that has
+zsh. Startup is around 50 ms.
+
+The prompt puts context on one line and your cursor on the next, so a deep
+path or a long branch name never costs you typing room:
+
+```
+~/code/dotfiles  fix-nvim-lsp-and-installer ✚ ⇡2
+❯
+```
+
+| | |
+|---|---|
+| `✚` | tracked files modified |
+| `●` | changes staged |
+| `?` | untracked files present |
+| `⇡2` `⇣1` | commits ahead of / behind upstream |
+| `(rebase-i)` | mid rebase, merge or cherry-pick |
+| `42 ❯` in red | the last command exited non-zero |
+
+Its colours are ANSI slot names, not hex, so it re-colours itself when
+`term-theme` flips light/dark.
+
+What else is set up:
+
+| | |
+|---|---|
+| Up / Down | search history for what you have already typed |
+| Tab | menu completion, case-insensitive, coloured like `ls` |
+| `^X^E` | edit the current command line in `$EDITOR` |
+| Alt-Backspace | delete one path segment |
+| `..` , `../..` | `cd` without typing `cd`; `cd -2` walks the stack |
+| `g` `gs` `gd` `gl` `gb` `gp` `gco` | short git aliases; `ll` `la` `v` `reload` |
+
+Machine-specific settings — work tokens, one-off PATH entries — go in
+`~/.zshrc.local` (or `~/.zprofile.local`), which are sourced last and are
+not in this repo.
+
+In a very large repository the per-prompt worktree scan behind `✚` gets
+slow. Exclude those repos by path rather than dropping the indicator
+everywhere:
+
+```zsh
+zstyle ':vcs_info:*' disable-patterns "$HOME/some/huge/repo(|/*)"
+```
+
+Completions installed today may not be offered until tomorrow — `compinit`
+does its full `fpath` rescan at most once a day, which is what keeps
+startup fast. To pick one up now:
+
+```bash
+rm -f ~/.cache/zsh/zcompdump-* && exec zsh -l
+```
+
+## Commit signing
+
+Chainguard repos need every commit both **signed** (gitsign, keyless via
+Sigstore) and **signed off** (a `Signed-off-by` trailer). Two aliases in
+`zsh/zshrc` cover the second half:
+
+```zsh
+gcm "message"   # git commit -s -m  — signed off
+gca             # git commit --amend --no-edit -s  — fix a missed signoff
+```
+
+`-s` is in the alias because there is no config for it. `commit.signoff` is
+**not** a real git option — set it and git silently ignores it. The
+alternative, a global `core.hooksPath` pointing at a `prepare-commit-msg`
+hook, would apply everywhere but also disable each repo's own `.git/hooks`,
+which the repos that require the signoff tend to rely on.
+
+Signing itself lives in `~/.gitconfig`, which this repo does not manage (it
+holds an email address and is per-machine):
+
+```bash
+git config --global commit.gpgsign true
+git config --global tag.gpgsign true
+git config --global gpg.format x509
+git config --global gpg.x509.program "$(command -v gitsign)"
+git config --global gitsign.connectorID https://accounts.google.com
+```
+
+`zsh/zshenv` supplies the two settings that have no git-config equivalent,
+`GITSIGN_REKOR_MODE=offline` and `GITSIGN_CREDENTIAL_CACHE`. They are in
+`zshenv` rather than `zshrc` on purpose: `zshrc` is skipped for
+non-interactive shells, and git never invokes gitsign from an interactive
+one, so putting them in `zshrc` means commits from hooks, scripts and editors
+silently sign in online mode with no cache.
+
+The cache needs a daemon holding its socket open; without it you get a
+browser auth per commit, which makes `git rebase` painful. `install.sh
+--check` reports whether it is running. On macOS, as a LaunchAgent at
+`~/Library/LaunchAgents/dev.sigstore.gitsign-credential-cache.plist`:
+
+```xml
+<key>ProgramArguments</key>
+<array><string>/opt/homebrew/bin/gitsign-credential-cache</string></array>
+<key>RunAtLoad</key><true/>
+<key>KeepAlive</key><true/>
+```
+
+```bash
+launchctl load -w ~/Library/LaunchAgents/dev.sigstore.gitsign-credential-cache.plist
+```
+
+On Linux, `systemctl --user start gitsign-credential-cache.socket`.
+
+To verify the whole chain end to end — all three lines must say `true`:
+
+```bash
+gitsign verify --certificate-identity=you@chainguard.dev \
+  --certificate-oidc-issuer=https://accounts.google.com HEAD
+```
+
+GitHub will still show these commits as "Unverified". That is expected: the
+Sigstore CA is not in GitHub's trust root, and gitsign's ephemeral certs need
+Rekor to validate they were live at signing time.
 
 ## Terminal theme
 
@@ -96,6 +221,8 @@ Required:
 - Neovim 0.10+ — the config uses `vim.fs.root`, `vim.snippet` and `vim.uv`
 - Alacritty 0.13+ (TOML config)
 - tmux 3.1+ (for the `~/.config/tmux/` path)
+- zsh 5.8+ — and it has to be your *login* shell, or `~/.zshrc` is never
+  read. `install.sh --check` says which shell you are actually on.
 - A C compiler — nvim-treesitter compiles parsers on install
 - AtkynsonMono Nerd Font
 - Lazy.nvim (auto-installed by the Neovim config)

@@ -50,6 +50,13 @@ if [ "$CHECK_ONLY" -eq 0 ]; then
     link "$DOTFILES_DIR/alacritty" "$CONFIG_DIR/alacritty" "alacritty config"
     link "$DOTFILES_DIR/tmux"      "$CONFIG_DIR/tmux"      "tmux config"
 
+    # zsh reads these from $HOME, not $XDG_CONFIG_HOME, unless ZDOTDIR is set
+    # before login — which has to happen in /etc/zshenv, outside this repo.
+    # Link the two dotfiles directly rather than depend on that.
+    link "$DOTFILES_DIR/zsh/zshrc"    "$HOME/.zshrc"    "zshrc"
+    link "$DOTFILES_DIR/zsh/zprofile" "$HOME/.zprofile" "zprofile"
+    link "$DOTFILES_DIR/zsh/zshenv"   "$HOME/.zshenv"   "zshenv"
+
     for script in "$DOTFILES_DIR"/bin/*; do
         [ -f "$script" ] || continue
         name="$(basename "$script")"
@@ -108,6 +115,18 @@ need git   "lazy.nvim clones plugins with it" \
     "xcode-select --install" "your package manager: git"
 need cc    "treesitter compiles parsers on install" \
     "xcode-select --install" "your package manager: build-essential / base-devel"
+need zsh   "the shell zsh/zshrc configures" \
+    "ships with macOS" "your package manager: zsh (5.8+)"
+
+# zsh/zshrc is only read by zsh. Linking it does nothing for a login shell
+# that is still bash, and that mismatch is silent — the prompt just never
+# changes. Worth one line of report.
+case "${SHELL:-}" in
+    */zsh) echo "  ✓ login shell is zsh" ;;
+    *)     echo "  · login shell is ${SHELL:-unknown}, so ~/.zshrc is never read"
+           hint "chsh -s /bin/zsh" "chsh -s \"\$(command -v zsh)\""
+           missing_optional=$((missing_optional + 1)) ;;
+esac
 
 echo
 echo "Terminal:"
@@ -174,6 +193,28 @@ else
     done
     hint "brew install python" "your package manager: python3.11 or newer"
     missing_optional=$((missing_optional + 1))
+fi
+
+echo
+echo "Commit signing:"
+want gitsign "signs commits for chainguard repos; zsh/zshenv configures it" \
+    "brew install gitsign" "see github.com/sigstore/gitsign#installation"
+
+# The env vars in zsh/zshenv only help if a daemon is actually holding the
+# socket open. Without it every signature opens a browser tab, which turns a
+# rebase into one auth per commit — worth reporting rather than discovering
+# mid-rebase. Test the socket, not the process: the Linux and macOS
+# supervisors differ, the socket path does not.
+if command -v gitsign >/dev/null 2>&1; then
+    if [ -S "${GITSIGN_CREDENTIAL_CACHE:-}" ]; then
+        echo "  ✓ gitsign credential cache is running"
+    else
+        echo "  · gitsign credential cache is not running — expect a browser"
+        echo "      tab per commit, including once per commit during a rebase"
+        hint "gitsign-credential-cache & (or a LaunchAgent; see README.md)" \
+             "systemctl --user start gitsign-credential-cache.socket"
+        missing_optional=$((missing_optional + 1))
+    fi
 fi
 
 echo

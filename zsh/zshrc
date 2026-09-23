@@ -1,0 +1,309 @@
+# zsh configuration — linked to ~/.zshrc by install.sh
+#
+# Deliberately dependency-free: every feature here is a zsh builtin, so a
+# fresh clone works on macOS and Linux with nothing else installed. No
+# framework, no plugin manager, no prompt binary.
+#
+# Machine-specific settings — work tokens, one-off PATH entries, anything
+# that should not be in a public repo — go in ~/.zshrc.local, sourced at the
+# bottom of this file.
+#
+# vim: ft=zsh
+
+# ------------------------------------------------------------------- path ---
+
+# `path` is the array tied to PATH; -U keeps both deduplicated, so re-sourcing
+# this file or nesting shells cannot grow PATH without bound.
+typeset -U path fpath
+
+path=("$HOME/.local/bin" $path "$HOME/go/bin")
+
+# Docker Desktop appends its own PATH/fpath lines to ~/.zshrc. That file is a
+# symlink into this repo now, so anything it adds lands here and shows up in
+# `git status` — fold it into these lists (with $HOME, not /Users/...) rather
+# than leaving the generated block at the bottom.
+[[ -d "$HOME/.docker/bin" ]] && path+=("$HOME/.docker/bin")
+
+# -------------------------------------------------------------- environment ---
+
+# nvim is the editor this repo configures, but don't leave EDITOR unset on a
+# machine that has not installed it yet — git, less and fc all need one.
+# $+commands[x] is a hash lookup, not a fork, so this is free at startup.
+for _editor in nvim vim vi; do
+    (( $+commands[$_editor] )) && { export EDITOR=$_editor; break }
+done
+unset _editor
+export VISUAL=$EDITOR
+
+# -R  keep colours from git/grep/delta instead of printing escape codes raw
+# -F  don't page output that already fits on one screen
+# -i  case-insensitive search until the pattern contains a capital
+export PAGER=less
+export LESS='-RFi'
+
+# Colour for file listings. macOS ls reads CLICOLOR/LSCOLORS, GNU ls reads
+# LS_COLORS — set both so `ls` looks the same on either platform, and so the
+# completion menu below has colours to reuse. These are ANSI slot numbers,
+# not hex, which is what makes them follow the terminal theme when
+# `term-theme` flips light/dark.
+export CLICOLOR=1
+: ${LS_COLORS:='di=1;34:ln=1;36:so=35:pi=33:ex=1;32:bd=1;33:cd=1;33:su=1;31:sg=1;31:tw=34;42:ow=34;43'}
+export LS_COLORS
+
+# ---------------------------------------------------------------- history ---
+
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=50000            # lines kept in memory for this session
+SAVEHIST=50000            # lines written to HISTFILE
+
+setopt extended_history       # record timestamp and duration per entry
+setopt share_history          # new commands appear in already-open shells
+setopt hist_ignore_dups       # don't record a command run twice in a row
+setopt hist_ignore_all_dups   # a repeat also removes the older copy
+setopt hist_ignore_space      # a leading space keeps a command out of history
+setopt hist_reduce_blanks     # normalise whitespace before storing
+setopt hist_expire_dups_first # trim duplicates before unique entries
+setopt hist_verify            # `!!` expands onto the line for review, not run
+
+# ------------------------------------------------------------- directories ---
+
+setopt auto_cd            # a bare path is a cd — `..` and `../..` just work
+setopt auto_pushd         # every cd pushes onto the stack, so `cd -2` works
+setopt pushd_ignore_dups
+setopt pushd_silent       # ...without printing the whole stack each time
+
+# ---------------------------------------------------------------- globbing ---
+
+setopt extended_glob      # ^negation, (#i) flags, **/ recursion, x~y exclusion
+setopt no_nomatch         # see below
+setopt numeric_glob_sort  # file10 sorts after file9, not after file1
+
+# no_nomatch is here because extended_glob makes `^` a pattern character, and
+# zsh's default is to abort a command whose glob matched nothing. Together
+# that breaks ordinary git usage — `git show HEAD^` and `git log HEAD^^` fail
+# with "no matches found" before git is ever executed, as does any unquoted
+# URL containing `?`. With no_nomatch the unmatched word is passed through
+# literally, which is what bash does and what those commands expect.
+
+# ------------------------------------------------------------ shell options ---
+
+setopt interactive_comments  # allow `# ...` when pasting commands
+setopt no_beep
+setopt no_flow_control       # free up ^S / ^Q, which nothing uses as XON/XOFF
+setopt long_list_jobs        # `jobs` shows the pid, not just the job number
+
+# -------------------------------------------------------------- completion ---
+
+# Homebrew's completions live under its prefix, which differs by platform
+# (/opt/homebrew, /usr/local, /home/linuxbrew/.linuxbrew). `brew shellenv` in
+# ~/.zprofile exports HOMEBREW_PREFIX; read that rather than hardcoding a path.
+[[ -n ${HOMEBREW_PREFIX-} && -d $HOMEBREW_PREFIX/share/zsh/site-functions ]] &&
+    fpath=("$HOMEBREW_PREFIX/share/zsh/site-functions" $fpath)
+
+[[ -d "$HOME/.docker/completions" ]] && fpath=("$HOME/.docker/completions" $fpath)
+
+# Keep the completion dump out of $HOME.
+_zcompdump="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompdump-${ZSH_VERSION}"
+[[ -d ${_zcompdump:h} ]] || mkdir -p ${_zcompdump:h}
+
+# compinit rescans every directory in fpath and rebuilds the dump on each
+# start, which is the single most expensive thing in a zsh startup once
+# Homebrew's ~100 completion files are on the list. -C skips the scan and
+# trusts the existing dump; do the full scan at most once a day.
+#
+# The cost: a completion installed today may not be offered until tomorrow.
+# `rm -f "$_zcompdump"` and open a new shell to pick it up immediately.
+autoload -Uz compinit
+if [[ -n ${_zcompdump}(#qN.mh-24) ]]; then
+    compinit -C -d "$_zcompdump"
+else
+    compinit -d "$_zcompdump"
+fi
+
+zstyle ':completion:*' menu select                    # arrow-key through matches
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS} # colour them like ls
+zstyle ':completion:*' group-name ''                  # group by type...
+zstyle ':completion:*:descriptions' format '%F{yellow}%d%f'   # ...and label each
+zstyle ':completion:*' special-dirs true              # offer ../ and ./
+zstyle ':completion:*' squeeze-slashes true           # a//b completes as a/b
+zstyle ':completion:*' use-cache on
+zstyle ':completion:*' cache-path "${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompcache"
+
+# Case-insensitive, then partial-word: `cd dow` finds Downloads, `ls f.t`
+# finds foo.txt. Tried in order — an exact-case match always wins.
+zstyle ':completion:*' matcher-list 'm:{a-z-}={A-Za-z_}' 'r:|[._-]/=* r:|=*'
+
+# zsh caches the location of every command it has run. Without this, a binary
+# installed since the shell started is "command not found" until `hash -r`.
+zstyle ':completion:*' rehash true
+
+# ------------------------------------------------------------------ prompt ---
+
+# Two lines: context on the first, a bare ❯ on the second. Long paths and
+# long branch names then cost nothing — what you type always starts in the
+# same column, and every command lines up when scrolling back through output.
+#
+#   ~/code/dotfiles  fix-nvim-lsp-and-installer ✚ ⇡2
+#   ❯
+#
+#   %b branch    ✚ unstaged    ● staged    ? untracked    ⇡⇣ vs upstream
+#
+# Colours are named ANSI slots (%F{magenta}), never hex, so the prompt
+# re-colours itself when `term-theme` flips light/dark — the same reason
+# bin/term-contrast holds every one of those slots to a contrast floor.
+
+autoload -Uz vcs_info add-zsh-hook
+
+zstyle ':vcs_info:*' enable git
+zstyle ':vcs_info:git:*' check-for-changes true
+zstyle ':vcs_info:git:*' unstagedstr ' %F{yellow}✚%f'
+zstyle ':vcs_info:git:*' stagedstr   ' %F{green}●%f'
+zstyle ':vcs_info:git:*' formats       ' %F{magenta}%b%f%u%c%m'
+zstyle ':vcs_info:git:*' actionformats ' %F{magenta}%b%f %F{red}(%a)%f%u%c%m'
+zstyle ':vcs_info:git*+set-message:*' hooks git-untracked git-ahead-behind
+
+# check-for-changes stats the whole worktree on every prompt. That is fine in
+# a normal repo and painful in a very large one; exclude those by path rather
+# than turning the indicator off everywhere:
+#
+#   zstyle ':vcs_info:*' disable-patterns "$HOME/some/huge/repo(|/*)"
+
+# %u and %c cover tracked changes only, so a directory holding nothing but new
+# files reads as clean. ls-files with --error-unmatch exits 0 as soon as one
+# untracked path exists — far cheaper than `git status | grep '??'`, which
+# formats the entire status first.
++vi-git-untracked() {
+    command git ls-files --others --exclude-standard --directory \
+        --no-empty-directory --error-unmatch -- ':/*' >/dev/null 2>&1 &&
+        hook_com[misc]+=' %F{blue}?%f'
+    return 0
+}
+
+# vcs_info has no upstream distance of its own. rev-list only walks commit
+# objects — no worktree scan — so this is cheap next to check-for-changes.
++vi-git-ahead-behind() {
+    local counts
+    # Declaration and assignment are separate on purpose: the exit status of
+    # `local x=$(cmd)` is the status of `local`, which is always 0, so the
+    # no-upstream case would fall through instead of returning here.
+    counts=$(command git rev-list --left-right --count HEAD...@{upstream} 2>/dev/null) || return 0
+    local -a ab=(${=counts})
+    (( $#ab == 2 )) || return 0
+    (( ab[1] )) && hook_com[misc]+=" %F{green}⇡${ab[1]}%f"
+    (( ab[2] )) && hook_com[misc]+=" %F{red}⇣${ab[2]}%f"
+    return 0
+}
+
+add-zsh-hook precmd vcs_info
+
+setopt prompt_subst   # required for ${vcs_info_msg_0_} to expand per prompt
+
+# %n@%m only over ssh — worth the space there, noise on a local shell. Built
+# once here rather than with `${SSH_CONNECTION:+...}` inside PROMPT: that
+# form ends at the first `}`, which `%F{yellow}` supplies, so the rest of the
+# replacement escapes the conditional and prints on every prompt, ssh or not.
+PROMPT=''
+[[ -n ${SSH_CONNECTION-} ]] && PROMPT='%F{yellow}%n@%m%f '
+
+# %(?..) prints the exit status only when the last command failed, and
+# colours ❯ red in the same case.
+PROMPT+='%F{cyan}%~%f${vcs_info_msg_0_}
+%(?.%F{green}.%F{red}%? )❯%f '
+
+# Window and tab title: the directory while sitting at the prompt, the running
+# command while one is in the foreground. Both Alacritty and tmux read OSC 2.
+if [[ $TERM != (dumb|linux) ]]; then
+    _title_precmd()  { print -Pn "\e]2;%~\a" }
+    # A command line can contain % — double it, or print -P reads it as a
+    # prompt escape and mangles the title.
+    _title_preexec() { print -Pn "\e]2;${${1%% *}//\%/%%} — %~\a" }
+    add-zsh-hook precmd  _title_precmd
+    add-zsh-hook preexec _title_preexec
+fi
+
+# ------------------------------------------------------------- keybindings ---
+
+bindkey -e   # emacs keys: ^A ^E ^K ^U ^W. Explicit, because zsh otherwise
+             # picks vi mode whenever $EDITOR matches *vi*, which nvim does.
+
+# Up/Down search history for what has already been typed, instead of walking
+# every command blindly: type `git co`, press Up, get your last `git commit`.
+# The -end variants leave the cursor at the end of the recalled line.
+autoload -Uz history-search-end
+zle -N history-beginning-search-backward-end history-search-end
+zle -N history-beginning-search-forward-end  history-search-end
+
+# Bind both the raw sequences and terminfo's, since a terminal in application
+# keypad mode sends ^[OA for Up where it otherwise sends ^[[A.
+bindkey '^[[A' history-beginning-search-backward-end
+bindkey '^[[B' history-beginning-search-forward-end
+bindkey '^[OA' history-beginning-search-backward-end
+bindkey '^[OB' history-beginning-search-forward-end
+[[ -n ${terminfo[kcuu1]} ]] && bindkey "${terminfo[kcuu1]}" history-beginning-search-backward-end
+[[ -n ${terminfo[kcud1]} ]] && bindkey "${terminfo[kcud1]}" history-beginning-search-forward-end
+
+bindkey '^[[3~'   delete-char      # Delete
+bindkey '^[[H'    beginning-of-line
+bindkey '^[[F'    end-of-line
+bindkey '^[[1;5C' forward-word     # Ctrl-Right
+bindkey '^[[1;5D' backward-word    # Ctrl-Left
+bindkey '^[[1;3C' forward-word     # Alt-Right
+bindkey '^[[1;3D' backward-word    # Alt-Left
+bindkey '^[^?'    backward-kill-word  # Alt-Backspace
+
+# Words end at / and = as well as at whitespace, so Alt-Backspace deletes one
+# path segment rather than the whole path. (Default WORDCHARS includes them.)
+WORDCHARS='*?_-.[]~&;!#$%^(){}<>'
+
+# ^X^E opens the current line in $EDITOR; write, quit, and it runs. For when
+# a one-liner outgrew the prompt.
+autoload -Uz edit-command-line
+zle -N edit-command-line
+bindkey '^X^E' edit-command-line
+
+# ---------------------------------------------------------------- aliases ---
+
+# GNU ls colourises with --color, BSD ls errors on the flag and uses CLICOLOR
+# (exported above) instead. Ask the ls that is actually on PATH.
+if ls --color=auto . >/dev/null 2>&1; then
+    alias ls='ls --color=auto'
+fi
+alias ll='ls -lh'
+alias la='ls -lAh'
+alias grep='grep --color=auto'
+
+alias g='git'
+alias gs='git status -sb'
+alias gd='git diff'
+alias gds='git diff --staged'
+alias gl='git log --oneline --graph --decorate -20'
+alias gb='git branch -vv'
+alias gco='git switch'
+alias gp='git pull --ff-only'
+
+# -s (Signed-off-by) is baked in because Chainguard repos reject commits
+# without it, and git has no config to add it — commit.signoff is not a real
+# option, it is silently ignored. Baking it into the alias is the only way to
+# get it by default without a global core.hooksPath, which would disable the
+# per-repo hooks those same repos ship.
+#
+#   gcm "message"   commit staged changes, signed off
+#   gca             fix a commit that missed the signoff, message unchanged
+alias gcm='git commit -s -m'
+alias gca='git commit --amend --no-edit -s'
+
+alias v=$EDITOR
+alias path='print -l $path'
+alias reload='exec $SHELL -l'
+
+# ------------------------------------------------------- machine overrides ---
+
+# Last, so it can override anything above. Not tracked in this repo.
+[[ -r "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
+
+# The file above usually does not exist, and that failing test would be the
+# last command this file runs — leaving $? at 1 for the session. The very
+# first prompt then draws its red `1 ❯` failure marker before you have typed
+# anything, and `zsh -ic exit` reports 1. Same trap as bin/term-theme; see
+# "the last command sets the exit status" in AGENTS.md.
+true
